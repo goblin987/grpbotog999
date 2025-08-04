@@ -819,6 +819,7 @@ async def handle_vote_button(update: telegram.Update, context: telegram.ext.Cont
         votes_weekly.setdefault(seller, 0)
         votes_alltime.setdefault(seller, 0)
         votes_monthly.setdefault(seller, [])
+        vote_history.setdefault(seller, [])  # FIX: Initialize vote_history for new sellers
 
         votes_weekly[seller] += 1
         votes_monthly[seller].append((now, 1))
@@ -1271,6 +1272,12 @@ async def addseller(update: telegram.Update, context: telegram.ext.ContextTypes.
     
     try:
         trusted_sellers.append(vendor)
+        # Initialize data structures for new seller
+        votes_weekly.setdefault(vendor, 0)
+        votes_monthly.setdefault(vendor, [])
+        votes_alltime.setdefault(vendor, 0)
+        vote_history.setdefault(vendor, [])
+        
         msg = await update.message.reply_text(f"Pardavėjas {vendor} pridėtas! Jis dabar matomas /balsuoti sąraše.")
         context.job_queue.run_once(delete_message_job, 45, data=(chat_id, msg.message_id))
         await update_voting_message(context)
