@@ -55,22 +55,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info(f"Running on Python {sys.version}")
 
-# Environment detection
-RENDER_ENV = os.getenv('RENDER') == 'true'
-PORT = int(os.getenv('PORT', 8443))  # Render.com provides PORT env var
-WEBHOOK_HOST = os.getenv('RENDER_EXTERNAL_URL')  # Render.com provides this
-WEBHOOK_PATH = f"/webhook/{os.getenv('TELEGRAM_TOKEN', 'token')}"
-WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
-
-logger.info(f"Environment - RENDER: {RENDER_ENV}, PORT: {PORT}, WEBHOOK_URL: {WEBHOOK_URL}")
-
-# Debug persistent storage
+# IMMEDIATE DEBUG: Check persistent storage setup
+logger.info("=" * 50)
+logger.info("PERSISTENT STORAGE DEBUG - STARTUP")
+logger.info("=" * 50)
 logger.info(f"DATA_DIR configured as: {DATA_DIR}")
 logger.info(f"DATA_DIR exists: {os.path.exists(DATA_DIR)}")
-logger.info(f"DATA_DIR is writable: {os.access(DATA_DIR, os.W_OK) if os.path.exists(DATA_DIR) else 'N/A'}")
-
-# List existing files in DATA_DIR
 if os.path.exists(DATA_DIR):
+    logger.info(f"DATA_DIR is writable: {os.access(DATA_DIR, os.W_OK)}")
     try:
         files = os.listdir(DATA_DIR)
         logger.info(f"Existing files in DATA_DIR: {files}")
@@ -84,25 +76,29 @@ if os.path.exists(DATA_DIR):
 else:
     logger.warning(f"DATA_DIR {DATA_DIR} does not exist!")
 
-# Check disk space
-try:
-    import shutil
-    total, used, free = shutil.disk_usage(DATA_DIR if os.path.exists(DATA_DIR) else '/')
-    logger.info(f"Disk space - Total: {total//1024//1024//1024}GB, Used: {used//1024//1024//1024}GB, Free: {free//1024//1024//1024}GB")
-except Exception as e:
-    logger.error(f"Failed to check disk space: {e}")
-
-# Test write functionality
+# Test write functionality immediately
 try:
     os.makedirs(DATA_DIR, exist_ok=True)
-    test_file = os.path.join(DATA_DIR, 'test_write.txt')
+    test_file = os.path.join(DATA_DIR, 'startup_test.txt')
     with open(test_file, 'w') as f:
-        f.write('test')
-    logger.info("✅ Successfully wrote test file to DATA_DIR")
-    os.remove(test_file)
-    logger.info("✅ Successfully removed test file from DATA_DIR")
+        f.write(f'Bot started at {datetime.now()}')
+    logger.info("✅ SUCCESSFULLY wrote startup test file to DATA_DIR")
+    logger.info(f"✅ Test file created at: {test_file}")
 except Exception as e:
-    logger.error(f"❌ Failed to write to DATA_DIR: {e}")
+    logger.error(f"❌ FAILED to write to DATA_DIR: {e}")
+
+logger.info("=" * 50)
+
+# Environment detection
+RENDER_ENV = os.getenv('RENDER') == 'true'
+PORT = int(os.getenv('PORT', 8443))  # Render.com provides PORT env var
+WEBHOOK_HOST = os.getenv('RENDER_EXTERNAL_URL')  # Render.com provides this
+WEBHOOK_PATH = f"/webhook/{os.getenv('TELEGRAM_TOKEN', 'token')}"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
+
+logger.info(f"Environment - RENDER: {RENDER_ENV}, PORT: {PORT}, WEBHOOK_URL: {WEBHOOK_URL}")
+
+
 
 # Analytics and Metrics System
 class BotAnalytics:
@@ -1018,7 +1014,7 @@ async def handle_poll_button(update: telegram.Update, context: telegram.ext.Cont
     await query.edit_message_text(f"📊 Apklausa: {poll['question']}\nBalsai: Taip - {poll['yes']}, Ne - {poll['no']}", reply_markup=reply_markup)
     await query.answer("Tavo balsas užskaitytas!")
 
-async def cleanup_old_polls():
+async def cleanup_old_polls(context):
     """Clean up polls older than 24 hours to prevent memory leaks"""
     current_time = datetime.now(TIMEZONE).timestamp()
     polls_to_remove = []
@@ -1039,7 +1035,7 @@ async def cleanup_old_polls():
     if polls_to_remove:
         logger.info(f"Cleaned up {len(polls_to_remove)} old polls")
 
-async def cleanup_expired_challenges():
+async def cleanup_expired_challenges(context):
     """Clean up expired coinflip challenges to prevent memory leaks"""
     current_time = datetime.now(TIMEZONE)
     challenges_to_remove = []
@@ -1054,7 +1050,7 @@ async def cleanup_expired_challenges():
     if challenges_to_remove:
         logger.info(f"Cleaned up {len(challenges_to_remove)} expired coinflip challenges")
 
-async def cleanup_memory():
+async def cleanup_memory(context):
     """Clean up data structures to prevent memory leaks"""
     now = datetime.now(TIMEZONE)
     
@@ -1082,7 +1078,7 @@ async def cleanup_memory():
         logger.info("Trimmed username_to_id cache")
     
     # Clean up expired challenges
-    await cleanup_expired_challenges()
+    await cleanup_expired_challenges(None)
     
     # Clean up old rate limiter data (older than 1 hour)
     rate_limiter_cutoff = now - timedelta(hours=1)
