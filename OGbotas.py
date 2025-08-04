@@ -27,9 +27,12 @@ from aiohttp import web
 from aiohttp.web_request import Request
 from aiohttp.web_response import Response
 
+# Configure data directory first
+DATA_DIR = os.getenv('DATA_DIR', '/opt/render/data')
+
 # Configure logging with rotating logs
 from logging.handlers import RotatingFileHandler
-log_dir = Path(os.getenv('DATA_DIR', '/opt/render/data')) / 'logs'
+log_dir = Path(DATA_DIR) / 'logs'
 log_dir.mkdir(parents=True, exist_ok=True)
 
 # Setup rotating file handler
@@ -60,6 +63,46 @@ WEBHOOK_PATH = f"/webhook/{os.getenv('TELEGRAM_TOKEN', 'token')}"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
 
 logger.info(f"Environment - RENDER: {RENDER_ENV}, PORT: {PORT}, WEBHOOK_URL: {WEBHOOK_URL}")
+
+# Debug persistent storage
+logger.info(f"DATA_DIR configured as: {DATA_DIR}")
+logger.info(f"DATA_DIR exists: {os.path.exists(DATA_DIR)}")
+logger.info(f"DATA_DIR is writable: {os.access(DATA_DIR, os.W_OK) if os.path.exists(DATA_DIR) else 'N/A'}")
+
+# List existing files in DATA_DIR
+if os.path.exists(DATA_DIR):
+    try:
+        files = os.listdir(DATA_DIR)
+        logger.info(f"Existing files in DATA_DIR: {files}")
+        for file in files:
+            filepath = os.path.join(DATA_DIR, file)
+            if os.path.isfile(filepath):
+                size = os.path.getsize(filepath)
+                logger.info(f"  {file}: {size} bytes")
+    except Exception as e:
+        logger.error(f"Failed to list DATA_DIR contents: {e}")
+else:
+    logger.warning(f"DATA_DIR {DATA_DIR} does not exist!")
+
+# Check disk space
+try:
+    import shutil
+    total, used, free = shutil.disk_usage(DATA_DIR if os.path.exists(DATA_DIR) else '/')
+    logger.info(f"Disk space - Total: {total//1024//1024//1024}GB, Used: {used//1024//1024//1024}GB, Free: {free//1024//1024//1024}GB")
+except Exception as e:
+    logger.error(f"Failed to check disk space: {e}")
+
+# Test write functionality
+try:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    test_file = os.path.join(DATA_DIR, 'test_write.txt')
+    with open(test_file, 'w') as f:
+        f.write('test')
+    logger.info("✅ Successfully wrote test file to DATA_DIR")
+    os.remove(test_file)
+    logger.info("✅ Successfully removed test file from DATA_DIR")
+except Exception as e:
+    logger.error(f"❌ Failed to write to DATA_DIR: {e}")
 
 # Analytics and Metrics System
 class BotAnalytics:
@@ -301,7 +344,6 @@ except (ValueError, TypeError):
 
 PASSWORD = os.getenv('PASSWORD', 'shoebot123')
 VOTING_GROUP_LINK = os.getenv('VOTING_GROUP_LINK')
-DATA_DIR = os.getenv('DATA_DIR', '/opt/render/data')  # Configurable data directory
 
 # Check if required environment variables are set
 if not TOKEN:
