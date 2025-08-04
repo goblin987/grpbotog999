@@ -389,9 +389,10 @@ def save_data(data, filename):
             pickle.dump(data, f)
         # Atomic move operation
         os.replace(temp_filepath, filepath)
-        logger.info(f"Saved data to {filepath}")
+        file_size = os.path.getsize(filepath)
+        logger.info(f"✅ Saved {filename}: {file_size} bytes, {len(data) if hasattr(data, '__len__') else 'N/A'} entries")
     except Exception as e:
-        logger.error(f"Failed to save {filepath}: {str(e)}")
+        logger.error(f"❌ Failed to save {filepath}: {str(e)}")
         # Clean up temp file if it exists
         temp_filepath = filepath + '.tmp'
         if os.path.exists(temp_filepath):
@@ -431,6 +432,10 @@ class DataManager:
 data_manager = DataManager()
 
 # Load initial data
+logger.info("=" * 50)
+logger.info("LOADING DATA FILES...")
+logger.info("=" * 50)
+
 featured_media_id = load_data('featured_media_id.pkl', None)
 featured_media_type = load_data('featured_media_type.pkl', None)
 barygos_media_id = load_data('barygos_media_id.pkl', None)
@@ -470,9 +475,32 @@ logger.info("Bot initialized")
 
 # Data structures
 trusted_sellers = ['@Seller1', '@Seller2', '@Seller3']
+
+# Load critical vote data with detailed logging
+logger.info("Loading votes_weekly.pkl...")
 votes_weekly = load_data('votes_weekly.pkl', defaultdict(int))
+logger.info(f"votes_weekly loaded: {len(votes_weekly)} entries, sample: {dict(list(votes_weekly.items())[:3])}")
+
+logger.info("Loading votes_monthly.pkl...")
 votes_monthly = load_data('votes_monthly.pkl', defaultdict(list))
+logger.info(f"votes_monthly loaded: {len(votes_monthly)} entries")
+
+logger.info("Loading votes_alltime.pkl...")
 votes_alltime = load_data('votes_alltime.pkl', defaultdict(int))
+logger.info(f"votes_alltime loaded: {len(votes_alltime)} entries, sample: {dict(list(votes_alltime.items())[:3])}")
+
+logger.info("Loading user_points.pkl...")
+user_points = load_data('user_points.pkl', defaultdict(int))
+logger.info(f"user_points loaded: {len(user_points)} users")
+
+logger.info("Loading alltime_messages.pkl...")
+alltime_messages = load_data('alltime_messages.pkl', defaultdict(int))
+logger.info(f"alltime_messages loaded: {len(alltime_messages)} users")
+
+logger.info("Loading chat_streaks.pkl...")
+chat_streaks = load_data('chat_streaks.pkl', defaultdict(int))
+logger.info(f"chat_streaks loaded: {len(chat_streaks)} users")
+
 voters = set()
 downvoters = set()
 pending_downvotes = {}
@@ -481,14 +509,15 @@ vote_history = load_data('vote_history.pkl', defaultdict(list))
 last_vote_attempt = defaultdict(lambda: datetime.min.replace(tzinfo=TIMEZONE))
 last_downvote_attempt = defaultdict(lambda: datetime.min.replace(tzinfo=TIMEZONE))
 complaint_id = 0
-user_points = load_data('user_points.pkl', defaultdict(int))
 coinflip_challenges = {}
 daily_messages = defaultdict(lambda: defaultdict(int))
 weekly_messages = defaultdict(int)
-alltime_messages = load_data('alltime_messages.pkl', defaultdict(int))
-chat_streaks = load_data('chat_streaks.pkl', defaultdict(int))
 last_chat_day_raw = load_data('last_chat_day.pkl', {})
 last_chat_day = defaultdict(lambda: datetime.min.replace(tzinfo=TIMEZONE), last_chat_day_raw)
+
+logger.info("=" * 50)
+logger.info("DATA LOADING COMPLETED")
+logger.info("=" * 50)
 allowed_groups = {str(GROUP_CHAT_ID)}  # Store as strings for consistency
 valid_licenses = {'LICENSE-XYZ123', 'LICENSE-ABC456'}
 pending_activation = {}
