@@ -1044,7 +1044,7 @@ async def handle_poll_button(update: telegram.Update, context: telegram.ext.Cont
     await query.edit_message_text(f"📊 Apklausa: {poll['question']}\nBalsai: Taip - {poll['yes']}, Ne - {poll['no']}", reply_markup=reply_markup)
     await query.answer("Tavo balsas užskaitytas!")
 
-async def cleanup_old_polls(context):
+async def cleanup_old_polls(context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Clean up polls older than 24 hours to prevent memory leaks"""
     current_time = datetime.now(TIMEZONE).timestamp()
     polls_to_remove = []
@@ -1065,7 +1065,7 @@ async def cleanup_old_polls(context):
     if polls_to_remove:
         logger.info(f"Cleaned up {len(polls_to_remove)} old polls")
 
-async def cleanup_expired_challenges(context):
+async def cleanup_expired_challenges(context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Clean up expired coinflip challenges to prevent memory leaks"""
     current_time = datetime.now(TIMEZONE)
     challenges_to_remove = []
@@ -1080,7 +1080,7 @@ async def cleanup_expired_challenges(context):
     if challenges_to_remove:
         logger.info(f"Cleaned up {len(challenges_to_remove)} expired coinflip challenges")
 
-async def cleanup_memory(context):
+async def cleanup_memory(context: telegram.ext.ContextTypes.DEFAULT_TYPE):
     """Clean up data structures to prevent memory leaks"""
     now = datetime.now(TIMEZONE)
     
@@ -1107,8 +1107,19 @@ async def cleanup_memory(context):
         username_to_id.update(items[-5000:])
         logger.info("Trimmed username_to_id cache")
     
-    # Clean up expired challenges
-    await cleanup_expired_challenges(None)
+    # Clean up expired challenges (manual cleanup, not scheduled)
+    current_time = datetime.now(TIMEZONE)
+    challenges_to_remove = []
+    
+    for user_id, (initiator_id, amount, timestamp, initiator_username, opponent_username, chat_id) in coinflip_challenges.items():
+        if current_time - timestamp > timedelta(minutes=10):  # 10 minutes expiry
+            challenges_to_remove.append(user_id)
+    
+    for user_id in challenges_to_remove:
+        del coinflip_challenges[user_id]
+    
+    if challenges_to_remove:
+        logger.info(f"Memory cleanup: removed {len(challenges_to_remove)} expired coinflip challenges")
     
     # Clean up old rate limiter data (older than 1 hour)
     rate_limiter_cutoff = now - timedelta(hours=1)
@@ -3369,17 +3380,17 @@ application.job_queue.run_repeating(cleanup_expired_challenges, interval=300, fi
 application.job_queue.run_repeating(cleanup_memory, interval=3600, first=60)  # Memory cleanup every hour
 
 # Weekly recap and reset - Every Sunday at 23:00
-application.job_queue.scheduler.add_job(
-    lambda: asyncio.create_task(weekly_recap(application)), 
-    CronTrigger(day_of_week='sun', hour=23, minute=0, timezone=TIMEZONE), 
-    id='weekly_recap'
+application.job_queue.run_weekly(
+    lambda context: asyncio.create_task(weekly_recap(context)),
+    days=(6,),  # Sunday (0=Monday, 6=Sunday)
+    time=time(hour=23, minute=0)
 )
 
-# Monthly recap and reset - First day of each month at 00:30
-application.job_queue.scheduler.add_job(
-    lambda: asyncio.create_task(monthly_recap_and_reset(application)), 
-    CronTrigger(day=1, hour=0, minute=30, timezone=TIMEZONE), 
-    id='monthly_recap'
+# Monthly recap and reset - First day of each month at 00:30  
+application.job_queue.run_monthly(
+    lambda context: asyncio.create_task(monthly_recap_and_reset(context)),
+    when=time(hour=0, minute=30),
+    day=1
 )
 
 # Achievement and Badge System
