@@ -849,11 +849,41 @@ async def handle_vote_button(update: telegram.Update, context: telegram.ext.Cont
     else:
         voter_username = f"Vartotojas {user_id}"
     
-    # Send confirmation message with clear vote information
-    confirmation_msg = await context.bot.send_message(
-        chat_id=chat_id, 
-        text=f"✅ {voter_username} balsavo už '{seller}'\n💰 +5 taškai pridėti!"
-    )
+    # Calculate when user can vote next (7 days from now)
+    next_vote_time = now + timedelta(days=7)
+    next_vote_formatted = next_vote_time.strftime("%Y-%m-%d %H:%M")
+    
+    # Get current vote counts for the seller
+    seller_name = seller[1:] if seller.startswith('@') else seller  # Remove @ for display
+    weekly_votes = votes_weekly.get(seller, 0)
+    alltime_votes = votes_alltime.get(seller, 0)
+    
+    # Send enhanced confirmation message with vote details
+    confirmation_text = f"🗳️ **BALSAS UŽSKAITYTAS** 🗳️\n\n"
+    confirmation_text += f"👤 **Balsavo:** {voter_username}\n"
+    confirmation_text += f"🏷️ **Už:** {seller_name}\n"
+    confirmation_text += f"💰 **Gauti taškai:** +5\n\n"
+    confirmation_text += f"📊 **{seller_name} balsai:**\n"
+    confirmation_text += f"• Šią savaitę: **{weekly_votes}** balsų\n"
+    confirmation_text += f"• Viso laikų: **{alltime_votes}** balsų\n\n"
+    confirmation_text += f"⏰ **Kitas balsavimas:**\n"
+    confirmation_text += f"📅 {next_vote_formatted} (po 7 dienų)\n\n"
+    confirmation_text += f"🎯 Ačiū už dalyvavimą balsavime!"
+    
+    try:
+        confirmation_msg = await context.bot.send_message(
+            chat_id=chat_id, 
+            text=confirmation_text,
+            parse_mode='Markdown'
+        )
+    except telegram.error.TelegramError as e:
+        # Fallback without markdown if formatting fails
+        logger.warning(f"Failed to send formatted vote confirmation: {str(e)}")
+        fallback_text = confirmation_text.replace('**', '').replace('*', '')
+        confirmation_msg = await context.bot.send_message(
+            chat_id=chat_id, 
+            text=fallback_text
+        )
     
     # Delete confirmation message after 2 minutes (120 seconds)
     context.job_queue.run_once(delete_message_job, 120, data=(chat_id, confirmation_msg.message_id))
